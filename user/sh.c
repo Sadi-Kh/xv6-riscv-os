@@ -4,6 +4,55 @@
 #include "user/user.h"
 #include "kernel/fcntl.h"
 
+// ساده‌ترین strlen
+int my_strlen(const char *s) {
+  int n = 0;
+  while (s[n]) n++;
+  return n;
+}
+
+// ساده‌ترین strcat
+char *my_strcat(char *dest, const char *src) {
+  char *ptr = dest + my_strlen(dest);
+  while (*src) {
+    *ptr++ = *src++;
+  }
+  *ptr = '\0';
+  return dest;
+}
+
+// ساده‌ترین strstr برای تشخیص "os"
+int my_strcmp(const char *s1, const char *s2) {
+  while (*s1 && (*s1 == *s2)) {
+    s1++; s2++;
+  }
+  return *(const unsigned char*)s1 - *(const unsigned char*)s2;
+}
+
+// ساده‌ترین strtok (تک‌بار اجرا – فقط برای فاصله‌ها)
+char *my_strtok(char *str, const char *delim) {
+  static char *last;
+  if (str) last = str;
+  if (!last) return 0;
+
+  // Skip leading delimiters
+  while (*last && *last == *delim) last++;
+  if (*last == 0) return 0;
+
+  char *start = last;
+  while (*last && *last != *delim) last++;
+
+  if (*last) {
+    *last = 0;
+    last++;
+  } else {
+    last = 0;
+  }
+
+  return start;
+}
+
+
 // Parsed command representation
 #define EXEC  1
 #define REDIR 2
@@ -73,12 +122,43 @@ runcmd(struct cmd *cmd)
     panic("runcmd");
 
   case EXEC:
-    ecmd = (struct execcmd*)cmd;
-    if(ecmd->argv[0] == 0)
-      exit(1);
-    exec(ecmd->argv[0], ecmd->argv);
-    fprintf(2, "exec %s failed\n", ecmd->argv[0]);
-    break;
+  ecmd = (struct execcmd*)cmd;
+
+  if(ecmd->argv[0] == 0)
+    exit(1);
+
+  // اگر دستور ! است
+  if(ecmd->argv[0] && my_strcmp(ecmd->argv[0], "!") == 0){
+    char fullmsg[1024] = {0};
+
+    for(int i = 1; ecmd->argv[i]; i++) {
+      my_strcat(fullmsg, ecmd->argv[i]);
+      if(ecmd->argv[i+1])
+        my_strcat(fullmsg, " ");
+    }
+
+    if(my_strlen(fullmsg) > 512) {
+      printf("Message too long\n");
+    }
+
+    char* token = my_strtok(fullmsg, " ");
+    while(token) {
+      if(my_strcmp(token, "os") == 0) {
+        printf("\033[1;34m%s\033[0m ", token);  // آبی
+      } else {
+        printf("%s ", token);
+      }
+      token = my_strtok(0, " ");
+    }
+    printf("\n");
+
+    exit(0);
+  }
+
+  exec(ecmd->argv[0], ecmd->argv);
+  fprintf(2, "exec %s failed\n", ecmd->argv[0]);
+  break;
+
 
   case REDIR:
     rcmd = (struct redircmd*)cmd;
@@ -134,7 +214,7 @@ runcmd(struct cmd *cmd)
 int
 getcmd(char *buf, int nbuf)
 {
-  write(2, "$ ", 2);
+  write(2, "sadegh-ali$ ", 12);
   memset(buf, 0, nbuf);
   gets(buf, nbuf);
   if(buf[0] == 0) // EOF
